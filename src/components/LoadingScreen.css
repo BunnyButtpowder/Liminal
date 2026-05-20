@@ -150,6 +150,29 @@
   border: 40px solid #0a0a0a;
 }
 
+/* ── Mobile adjustments ── */
+
+@media (max-width: 768px) {
+  .loading-vignette {
+    background: radial-gradient(
+      ellipse at center,
+      transparent 60%,
+      rgba(0, 0, 0, 0.4) 85%,
+      rgba(0, 0, 0, 0.8) 100%
+    );
+  }
+
+  .loading-curve-overlay {
+    box-shadow:
+      inset 0 0 40px 20px #0a0a0a,
+      inset 0 0 80px 40px rgba(10, 10, 10, 0.4);
+  }
+
+  .loading-screen::before {
+    border-width: 20px;
+  }
+}
+
 /* ── Animations ── */
 
 @keyframes flicker {
