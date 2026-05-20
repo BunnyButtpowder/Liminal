@@ -14,7 +14,7 @@ export function Scene() {
         </Center>
         <Environment preset="studio" />
       </Suspense>
-      <OrbitControls />
+      <OrbitControls makeDefault />
     </Canvas>
   )
 }

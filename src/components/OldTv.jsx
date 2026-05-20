@@ -7,11 +7,148 @@ Source: https://sketchfab.com/3d-models/old-tv-3fb1a4b9d14c44abaac69fec119bf251
 Title: Old TV
 */
 
-import React from 'react'
-import { useGLTF } from '@react-three/drei'
+import React, { useCallback, useEffect, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useGLTF, useVideoTexture } from '@react-three/drei'
+import * as THREE from 'three'
+
+const SCREEN_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+
+// CRT screen shader: aspect-correct cover fit + vintage TV effects
+// (chromatic aberration, scanlines, noise, vignette)
+const SCREEN_FRAG = /* glsl */ `
+  uniform sampler2D uMap;
+  uniform float uVideoAspect;
+  uniform float uScreenAspect;
+  uniform float uTime;
+  varying vec2 vUv;
+
+  // Pseudo-random noise
+  float rand(vec2 co) {
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+  }
+
+  void main() {
+    // Aspect-correct cover fit
+    vec2 scale = uVideoAspect > uScreenAspect
+      ? vec2(uVideoAspect / uScreenAspect, 1.0)
+      : vec2(1.0, uScreenAspect / uVideoAspect);
+    vec2 uv = (vUv - 0.5) / scale + 0.5;
+
+    // Chromatic aberration — offset R and B channels
+    float aberration = 0.003;
+    float r = texture2D(uMap, uv + vec2(aberration, 0.0)).r;
+    float g = texture2D(uMap, uv).g;
+    float b = texture2D(uMap, uv - vec2(aberration, 0.0)).b;
+    vec3 color = vec3(r, g, b);
+
+    // Scanlines
+    float scanline = sin(vUv.y * 800.0) * 0.08;
+    color -= scanline;
+
+    // Film grain noise (animated)
+    float noise = rand(vUv + fract(uTime)) * 0.12;
+    color += noise - 0.06;
+
+    // Vignette — darken edges
+    float dist = distance(vUv, vec2(0.5));
+    float vignette = smoothstep(0.7, 0.35, dist);
+    color *= vignette;
+
+    // Slight brightness boost to compensate for darkening effects
+    color *= 1.1;
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`
 
 export function OldTv(props) {
   const { nodes, materials } = useGLTF('/old_tv/scene.gltf')
+  const videoTexture = useVideoTexture('/Liminal_Trailer.mp4', {
+    muted: true,
+    loop: true,
+    playsInline: true,
+  })
+
+  // The gltf's authored UVs only cover a sub-region of the screen mesh, which
+  // forces large `repeat` values and produces edge stretching. We rebuild
+  // planar UVs from vertex positions so the screen surface maps to [0,1]²
+  // uniformly along the two largest in-plane axes.
+  const { screenGeometry, screenAspect } = useMemo(() => {
+    const geom = nodes.TV003_Glass_0.geometry.clone()
+    geom.computeBoundingBox()
+    const size = geom.boundingBox.getSize(new THREE.Vector3())
+    const min = geom.boundingBox.min
+    const axes = ['x', 'y', 'z']
+      .map((k) => ({ k, size: size[k], min: min[k] }))
+      .sort((a, b) => a.size - b.size)
+    const hAxis = axes[1]
+    const wAxis = axes[2]
+
+    const positions = geom.attributes.position
+    const uvs = new Float32Array(positions.count * 2)
+    for (let i = 0; i < positions.count; i++) {
+      const p = { x: positions.getX(i), y: positions.getY(i), z: positions.getZ(i) }
+      uvs[i * 2] = (p[wAxis.k] - wAxis.min) / wAxis.size
+      uvs[i * 2 + 1] = (p[hAxis.k] - hAxis.min) / hAxis.size
+    }
+    geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    return { screenGeometry: geom, screenAspect: wAxis.size / hAxis.size }
+  }, [nodes])
+
+  const screenMaterial = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: {
+          uMap: { value: videoTexture },
+          uVideoAspect: { value: 16 / 9 },
+          uScreenAspect: { value: screenAspect },
+          uTime: { value: 0 },
+        },
+        vertexShader: SCREEN_VERT,
+        fragmentShader: SCREEN_FRAG,
+        toneMapped: false,
+      }),
+    [videoTexture, screenAspect]
+  )
+
+  useEffect(() => {
+    const video = videoTexture.source?.data
+    if (!video) return
+    const apply = () => {
+      const { videoWidth, videoHeight } = video
+      if (!videoWidth || !videoHeight) return
+      screenMaterial.uniforms.uVideoAspect.value = videoWidth / videoHeight
+    }
+    if (video.videoWidth) {
+      apply()
+      return
+    }
+    video.addEventListener('loadedmetadata', apply)
+    return () => video.removeEventListener('loadedmetadata', apply)
+  }, [videoTexture, screenMaterial])
+
+  useEffect(() => () => screenMaterial.dispose(), [screenMaterial])
+  useEffect(() => () => screenGeometry.dispose(), [screenGeometry])
+
+  // Animate noise grain over time
+  useFrame((state) => {
+    screenMaterial.uniforms.uTime.value = state.clock.elapsedTime
+  })
+
+  const handleClick = useCallback(() => {
+    const video = videoTexture.source.data
+    if (video) {
+      video.muted = !video.muted
+    }
+  }, [videoTexture])
+
   return (
     <group {...props} dispose={null}>
       <group rotation={[-Math.PI / 2, 0, 0]} scale={100}>
@@ -24,7 +161,7 @@ export function OldTv(props) {
       </group>
       <mesh geometry={nodes.TV001_Base_0.geometry} material={materials.Base} rotation={[-Math.PI / 2, 0, 0]} scale={100} />
       <mesh geometry={nodes.TV002_Base_0.geometry} material={materials.Base} rotation={[-Math.PI / 2, 0, 0]} scale={100} />
-      <mesh geometry={nodes.TV003_Glass_0.geometry} material={materials.Glass} rotation={[-Math.PI / 2, 0, 0]} scale={100} />
+      <mesh geometry={screenGeometry} material={screenMaterial} rotation={[-Math.PI / 2, 0, 0]} scale={100} onClick={handleClick} />
       <mesh geometry={nodes.TV004_baseBack_0.geometry} material={materials.baseBack} rotation={[-Math.PI / 2, 0, 0]} scale={100} />
       <mesh geometry={nodes.TV005_Base_0.geometry} material={materials.Base} rotation={[-Math.PI / 2, 0, 0]} scale={100} />
       <mesh geometry={nodes.TV006_baseBack_0.geometry} material={materials.baseBack} rotation={[-Math.PI / 2, 0, 0]} scale={100} />

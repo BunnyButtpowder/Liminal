@@ -1,0 +1,174 @@
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  transition: opacity 0.6s ease-out;
+  overflow: hidden;
+}
+
+.loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Content ── */
+
+.loading-content {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.loading-title {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: clamp(3rem, 10vw, 7rem);
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  color: #d4d0c8;
+  text-shadow:
+    0 0 20px rgba(200, 195, 180, 0.3),
+    0 0 60px rgba(200, 195, 180, 0.1);
+  animation: flicker 4s infinite;
+}
+
+/* ── Progress bar ── */
+
+.loading-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: clamp(200px, 40vw, 400px);
+}
+
+.loading-bar-track {
+  width: 100%;
+  height: 6px;
+  background: #1a1a18;
+  border: 1px solid #3a3830;
+  border-radius: 1px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 8px rgba(200, 195, 180, 0.05);
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    #7a7568,
+    #d4d0c8,
+    #7a7568
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+  transition: width 0.3s ease-out;
+  box-shadow: 0 0 6px rgba(200, 195, 180, 0.4);
+}
+
+.loading-percent {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  color: #7a7568;
+  letter-spacing: 0.2em;
+}
+
+/* ── Scanlines overlay ── */
+
+.loading-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+}
+
+/* ── Noise overlay ── */
+
+.loading-noise {
+  position: absolute;
+  inset: -50%;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  animation: grain 0.3s steps(3) infinite;
+}
+
+/* ── Vignette ── */
+
+.loading-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0, 0, 0, 0.6) 80%,
+    rgba(0, 0, 0, 0.95) 100%
+  );
+}
+
+/* ── Curved edges (CRT screen shape) ── */
+
+.loading-curve-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 80px 40px #0a0a0a,
+    inset 0 0 160px 80px rgba(10, 10, 10, 0.6);
+}
+
+/* Round the entire screen to simulate CRT bulge */
+.loading-screen::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: 8;
+  pointer-events: none;
+  border-radius: 50% / 12%;
+  box-shadow: inset 0 0 0 4px #0a0a0a;
+  border: 40px solid #0a0a0a;
+}
+
+/* ── Animations ── */
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+  97% { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-10px, 5px); }
+  66% { transform: translate(5px, -10px); }
+  100% { transform: translate(0, 0); }
+}
